@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { useNotify } from './NotificationContext';
 
 const SiteContext = createContext(null);
 
@@ -25,6 +26,9 @@ export function applyTheme(settings) {
 }
 
 export function SiteProvider({ children }) {
+  const { error: notifyError } = useNotify();
+  const notifyRef = useRef(notifyError);
+  notifyRef.current = notifyError;
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +40,11 @@ export function SiteProvider({ children }) {
   };
 
   useEffect(() => {
-    reload().finally(() => setLoading(false));
+    reload()
+      .catch((e) => {
+        notifyRef.current(e.message || 'Could not load website settings');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   return (

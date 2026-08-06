@@ -3,12 +3,17 @@ package com.codelife.aatmCollections.service;
 import com.codelife.aatmCollections.dto.ProductDtos;
 import com.codelife.aatmCollections.entity.Product;
 import com.codelife.aatmCollections.repository.ProductRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,15 +24,49 @@ public class ProductService {
     private final ProductRepository products;
 
     @Transactional(readOnly = true)
-    public List<ProductDtos.ProductResponse> listPublic(String search) {
-        List<Product> rows;
-        if (search != null && !search.isBlank()) {
-            String q = search.trim();
-            rows = products.findByActiveTrueAndNameContainingIgnoreCaseOrActiveTrueAndSkuContainingIgnoreCase(q, q);
-        } else {
-            rows = products.findByActiveTrueOrderByNameAsc();
-        }
-        return rows.stream().map(this::toDto).toList();
+    public List<ProductDtos.ProductResponse> listPublic(ProductDtos.ProductFilter filter) {
+        Specification<Product> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isTrue(root.get("active")));
+
+            if (filter.search() != null && !filter.search().isBlank()) {
+                String q = "%" + filter.search().trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("name")), q),
+                        cb.like(cb.lower(root.get("sku")), q),
+                        cb.like(cb.lower(root.get("description")), q)));
+            }
+            if (filter.category() != null && !filter.category().isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("category")), filter.category().trim().toLowerCase()));
+            }
+            if (filter.minPrice() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), filter.minPrice()));
+            }
+            if (filter.maxPrice() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("price"), filter.maxPrice()));
+            }
+            if (Boolean.TRUE.equals(filter.inStock())) {
+                predicates.add(cb.greaterThan(root.get("stockQty"), 0));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return products.findAll(spec, toSort(filter.sort())).stream().map(this::toDto).toList();
+    }
+
+    private Sort toSort(String sort) {
+        if (sort == null) return Sort.by(Sort.Direction.ASC, "name");
+        return switch (sort) {
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "name_desc" -> Sort.by(Sort.Direction.DESC, "name");
+            default -> Sort.by(Sort.Direction.ASC, "name");
+        };
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> listCategories() {
+        return products.findDistinctActiveCategories();
     }
 
     @Transactional(readOnly = true)

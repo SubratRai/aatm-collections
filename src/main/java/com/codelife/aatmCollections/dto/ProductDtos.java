@@ -8,6 +8,15 @@ import java.math.BigDecimal;
 public final class ProductDtos {
     private ProductDtos() {}
 
+    public record ProductFilter(
+            String search,
+            String category,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Boolean inStock,
+            String sort) {
+    }
+
     @Data
     public static class ProductResponse {
         private String id;

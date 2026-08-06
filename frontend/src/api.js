@@ -20,9 +20,18 @@ async function request(path, { method = 'GET', body, token } = {}) {
 
 export const api = {
   getSiteSettings: () => request('/api/public/site-settings'),
-  getProducts: (search) =>
-    request(`/api/products${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getProducts: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') params.set(key, value);
+    });
+    const qs = params.toString();
+    return request(`/api/products${qs ? `?${qs}` : ''}`);
+  },
+  getCategories: () => request('/api/products/categories'),
   getProduct: (id) => request(`/api/products/${id}`),
+  erpSync: (token) => request('/api/admin/erp/sync', { method: 'POST', token }),
+  erpStatus: (token) => request('/api/admin/erp/status', { token }),
   register: (payload) => request('/api/auth/register', { method: 'POST', body: payload }),
   login: (payload) => request('/api/auth/login', { method: 'POST', body: payload }),
   me: (token) => request('/api/auth/me', { token }),
