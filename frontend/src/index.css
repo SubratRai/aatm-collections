@@ -1,0 +1,18 @@
+:root {
+  --color-primary: #1f4b3a;
+  --color-secondary: #c4a35a;
+  --color-accent: #e8d5a3;
+  --color-bg: #f7f4ef;
+  --color-text: #1a1a1a;
+  --font-family: Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+a { color: inherit; text-decoration: none; }
+button, input, textarea { font: inherit; }
