@@ -32,6 +32,16 @@ export const api = {
   getProduct: (id) => request(`/api/products/${id}`),
   erpSync: (token) => request('/api/admin/erp/sync', { method: 'POST', token }),
   erpStatus: (token) => request('/api/admin/erp/status', { token }),
+  getCart: (token) => request('/api/cart', { token }),
+  addToCart: (token, productId, quantity = 1) =>
+    request('/api/cart/items', { method: 'POST', body: { productId, quantity }, token }),
+  updateCartItem: (token, itemId, quantity) =>
+    request(`/api/cart/items/${itemId}`, { method: 'PUT', body: { quantity }, token }),
+  removeCartItem: (token, itemId) =>
+    request(`/api/cart/items/${itemId}`, { method: 'DELETE', token }),
+  checkout: (token, payload) =>
+    request('/api/orders/checkout', { method: 'POST', body: payload, token }),
+  myOrders: (token) => request('/api/orders', { token }),
   register: (payload) => request('/api/auth/register', { method: 'POST', body: payload }),
   login: (payload) => request('/api/auth/login', { method: 'POST', body: payload }),
   me: (token) => request('/api/auth/me', { token }),

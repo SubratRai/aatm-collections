@@ -58,6 +58,22 @@ public class ErpClient {
         return cachedToken;
     }
 
+    /** Posts a storefront order (customer + items + delivery) to Retail360. */
+    public JsonNode postOrder(JsonNode orderPayload) {
+        try {
+            return client().post()
+                    .uri("/api/ecommerce/orders")
+                    .header("Authorization", "Bearer " + token())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(orderPayload)
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (RestClientException e) {
+            throw new ErpUnavailableException(
+                    "Retail360 order push failed: " + e.getMessage(), e);
+        }
+    }
+
     /** Fetches the entire catalog (all pages) from Retail360. */
     public List<ErpCatalogItem> fetchCatalog() {
         try {

@@ -156,8 +156,12 @@ export function HomePage() {
 
 export function ProductPage() {
   const { id } = useParams();
-  const { error: notifyError } = useNotify();
+  const { token, user } = useAuth();
+  const { success, error: notifyError } = useNotify();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
+  const [qty, setQty] = useState(1);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -172,18 +176,51 @@ export function ProductPage() {
   if (error) return <p className="error">{error}</p>;
   if (!product) return <p>Loading…</p>;
 
+  const onAddToCart = async () => {
+    if (!user) {
+      navigate('/login', { state: { returnUrl: `/products/${id}` } });
+      return;
+    }
+    setAdding(true);
+    try {
+      await api.addToCart(token, product.id, qty);
+      success(`${product.name} added to cart`);
+    } catch (err) {
+      notifyError(err.message || 'Could not add to cart');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const outOfStock = product.stockQty <= 0;
+
   return (
     <section className="product-detail">
       <div className="product-image large">
         {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <div className="ph">{product.name.slice(0, 1)}</div>}
       </div>
       <div>
+        <span className="card-category">{product.category || 'General'}</span>
         <h1>{product.name}</h1>
-        <p className="muted">{product.sku} · {product.category || 'General'}</p>
+        <p className="muted">SKU: {product.sku}</p>
         <p>{product.description}</p>
-        <p><strong>₹{Number(product.price).toFixed(2)}</strong></p>
-        <p>Stock: {product.stockQty}</p>
-        <Link className="btn" to="/cart">Go to cart (login required)</Link>
+        <p className="detail-price">₹{Number(product.price).toFixed(2)}</p>
+        <p className={outOfStock ? 'error' : 'muted'}>
+          {outOfStock ? 'Out of stock' : `${product.stockQty} in stock`}
+        </p>
+        {!outOfStock && (
+          <div className="add-to-cart-row">
+            <div className="qty-control">
+              <button type="button" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
+              <span>{qty}</span>
+              <button type="button" onClick={() => setQty(Math.min(product.stockQty, qty + 1))}>+</button>
+            </div>
+            <button type="button" className="btn" onClick={onAddToCart} disabled={adding}>
+              {adding ? 'Adding…' : 'Add to cart'}
+            </button>
+            <Link className="linkish" to="/cart">View cart</Link>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -236,20 +273,202 @@ export function LoginPage() {
   );
 }
 
+const EMPTY_CHECKOUT = {
+  fullName: '',
+  phone: '',
+  line1: '',
+  line2: '',
+  city: '',
+  state: '',
+  postalCode: '',
+  country: 'India',
+  paymentMethod: 'COD',
+};
+
 export function CartPage() {
+  const { token, user } = useAuth();
+  const { success, error: notifyError } = useNotify();
+  const navigate = useNavigate();
+  const [cart, setCart] = useState(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_CHECKOUT });
+  const [placing, setPlacing] = useState(false);
+
+  const loadCart = () => {
+    api.getCart(token).then(setCart).catch((e) => notifyError(e.message || 'Could not load cart'));
+  };
+
+  useEffect(() => {
+    loadCart();
+    setForm((f) => ({ ...f, fullName: user?.fullName || '', phone: user?.phone || '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  if (!cart) return <p>Loading…</p>;
+
+  const onQty = async (item, quantity) => {
+    if (quantity < 1) return;
+    try {
+      setCart(await api.updateCartItem(token, item.id, quantity));
+    } catch (err) {
+      notifyError(err.message || 'Could not update quantity');
+    }
+  };
+
+  const onRemove = async (item) => {
+    try {
+      setCart(await api.removeCartItem(token, item.id));
+    } catch (err) {
+      notifyError(err.message || 'Could not remove item');
+    }
+  };
+
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const onPlaceOrder = async (e) => {
+    e.preventDefault();
+    setPlacing(true);
+    try {
+      const order = await api.checkout(token, form);
+      success(`Order placed successfully (₹${Number(order.totalAmount).toFixed(2)})`);
+      navigate('/orders');
+    } catch (err) {
+      notifyError(err.message || 'Could not place order');
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   return (
     <section>
       <h1>Your cart</h1>
-      <p className="muted">Cart APIs are ready for the next phase. Login works; checkout wiring comes next.</p>
+      {!cart.items.length ? (
+        <div className="empty-state">
+          <p>Your cart is empty.</p>
+          <Link className="btn" to="/">Browse products</Link>
+        </div>
+      ) : (
+        <div className="cart-layout">
+          <div className="cart-items">
+            {cart.items.map((item) => (
+              <div className="cart-item" key={item.id}>
+                <div className="cart-thumb">
+                  {item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : <div className="ph">{item.name.slice(0, 1)}</div>}
+                </div>
+                <div className="cart-item-info">
+                  <strong>{item.name}</strong>
+                  <span className="muted">₹{Number(item.unitPrice).toFixed(2)} each</span>
+                </div>
+                <div className="qty-control">
+                  <button type="button" onClick={() => onQty(item, item.quantity - 1)}>−</button>
+                  <span>{item.quantity}</span>
+                  <button type="button" onClick={() => onQty(item, item.quantity + 1)}>+</button>
+                </div>
+                <strong className="price">₹{Number(item.lineTotal).toFixed(2)}</strong>
+                <button type="button" className="linkish" onClick={() => onRemove(item)}>Remove</button>
+              </div>
+            ))}
+            <div className="cart-total">
+              <span>Total ({cart.itemCount} item{cart.itemCount === 1 ? '' : 's'})</span>
+              <strong className="price">₹{Number(cart.total).toFixed(2)}</strong>
+            </div>
+          </div>
+
+          <div className="admin-card checkout-card">
+            {!checkoutOpen ? (
+              <button type="button" className="btn full-width" onClick={() => setCheckoutOpen(true)}>
+                Proceed to checkout
+              </button>
+            ) : (
+              <form className="form" onSubmit={onPlaceOrder}>
+                <h2>Delivery details</h2>
+                <label>Full name<input name="fullName" required value={form.fullName} onChange={onChange} /></label>
+                <label>Phone (10+ digits)<input name="phone" required minLength={10} value={form.phone} onChange={onChange} /></label>
+                <label>Address line 1<input name="line1" required value={form.line1} onChange={onChange} /></label>
+                <label>Address line 2<input name="line2" value={form.line2} onChange={onChange} /></label>
+                <label>City<input name="city" required value={form.city} onChange={onChange} /></label>
+                <label>State<input name="state" value={form.state} onChange={onChange} /></label>
+                <label>PIN code<input name="postalCode" required value={form.postalCode} onChange={onChange} /></label>
+                <label>Payment
+                  <select name="paymentMethod" value={form.paymentMethod} onChange={onChange}>
+                    <option value="COD">Cash on Delivery</option>
+                  </select>
+                </label>
+                <button className="btn" type="submit" disabled={placing}>
+                  {placing ? 'Placing order…' : `Place order · ₹${Number(cart.total).toFixed(2)}`}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
+const ORDER_STATUS_LABEL = {
+  PENDING: 'Pending',
+  CONFIRMED: 'Confirmed',
+  PACKED: 'Packed',
+  SHIPPED: 'Shipped',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
+
 export function OrdersPage() {
+  const { token } = useAuth();
+  const { error: notifyError } = useNotify();
+  const [orders, setOrders] = useState(null);
+
+  useEffect(() => {
+    api.myOrders(token)
+      .then(setOrders)
+      .catch((e) => notifyError(e.message || 'Could not load orders'));
+  }, [token, notifyError]);
+
+  if (!orders) return <p>Loading…</p>;
+
   return (
     <section>
-      <h1>Orders</h1>
-      <p className="muted">Order history will appear here after checkout is enabled.</p>
+      <h1>Your orders</h1>
+      {!orders.length ? (
+        <div className="empty-state">
+          <p>No orders yet.</p>
+          <Link className="btn" to="/">Start shopping</Link>
+        </div>
+      ) : (
+        <div className="order-list">
+          {orders.map((o) => (
+            <div className="order-card" key={o.id}>
+              <div className="order-head">
+                <div>
+                  <strong>Order #{o.id.slice(0, 8).toUpperCase()}</strong>
+                  <span className="muted"> · {new Date(o.createdAt).toLocaleString()}</span>
+                </div>
+                <span className={`order-status status-${o.status.toLowerCase()}`}>
+                  {ORDER_STATUS_LABEL[o.status] || o.status}
+                </span>
+              </div>
+              <div className="order-items">
+                {o.items.map((item, i) => (
+                  <div className="order-item" key={i}>
+                    <span>{item.name} × {item.quantity}</span>
+                    <span>₹{Number(item.lineTotal).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="order-foot">
+                <span className="muted">
+                  {o.paymentMethod} · {o.paymentStatus === 'PENDING' ? 'Pay on delivery' : o.paymentStatus}
+                  {o.erpOrderId ? ` · Ref ${o.erpOrderId}` : ''}
+                </span>
+                <strong className="price">₹{Number(o.totalAmount).toFixed(2)}</strong>
+              </div>
+              {o.deliveryAddress ? <p className="muted order-address">Deliver to: {o.deliveryAddress}</p> : null}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
