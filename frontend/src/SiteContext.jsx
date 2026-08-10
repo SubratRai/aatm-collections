@@ -7,12 +7,12 @@ const SiteContext = createContext(null);
 export function applyTheme(settings) {
   if (!settings) return;
   const root = document.documentElement;
-  root.style.setProperty('--color-primary', settings.primaryColor || '#1f4b3a');
-  root.style.setProperty('--color-secondary', settings.secondaryColor || '#c4a35a');
-  root.style.setProperty('--color-accent', settings.accentColor || '#e8d5a3');
-  root.style.setProperty('--color-bg', settings.backgroundColor || '#f7f4ef');
-  root.style.setProperty('--color-text', settings.textColor || '#1a1a1a');
-  root.style.setProperty('--font-family', settings.fontFamily || "Georgia, 'Times New Roman', serif");
+  root.style.setProperty('--color-primary', settings.primaryColor || '#ef9422');
+  root.style.setProperty('--color-secondary', settings.secondaryColor || '#5b2c0e');
+  root.style.setProperty('--color-accent', settings.accentColor || '#7e3f98');
+  root.style.setProperty('--color-bg', settings.backgroundColor || '#faf6ef');
+  root.style.setProperty('--color-text', settings.textColor || '#2b2118');
+  root.style.setProperty('--font-family', settings.fontFamily || "'Jost', 'Segoe UI', system-ui, sans-serif");
   if (settings.metaTitle) document.title = settings.metaTitle;
   if (settings.faviconUrl) {
     let link = document.querySelector("link[rel='icon']");

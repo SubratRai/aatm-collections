@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from './api';
 import { useAuth } from './AuthContext';
 import { useNotify } from './NotificationContext';
@@ -17,11 +17,22 @@ const DEFAULT_FILTERS = {
 export function HomePage() {
   const { error: notifyError } = useNotify();
   const { settings } = useSite();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Keep filters in sync with URL (header search + category strip)
+  useEffect(() => {
+    setFilters((f) => ({
+      ...f,
+      search: searchParams.get('search') || '',
+      category: searchParams.get('category') || '',
+    }));
+  }, [searchParams]);
 
   useEffect(() => {
     api.getCategories().then(setCategories).catch(() => {});
@@ -51,7 +62,21 @@ export function HomePage() {
     return () => clearTimeout(t);
   }, [filters, notifyError]);
 
-  const setFilter = (name, value) => setFilters((f) => ({ ...f, [name]: value }));
+  const setFilter = (name, value) => {
+    setFilters((f) => ({ ...f, [name]: value }));
+    if (name === 'search' || name === 'category') {
+      const next = new URLSearchParams(searchParams);
+      if (value) next.set(name, value);
+      else next.delete(name);
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setSearchParams({}, { replace: true });
+  };
+
   const hasActiveFilters = filters.search || filters.category || filters.minPrice
     || filters.maxPrice || filters.inStock || filters.sort !== 'name';
 
@@ -64,10 +89,25 @@ export function HomePage() {
           <p className="hero-sub">
             {settings?.metaDescription || 'Handpicked pieces for your home and wardrobe, delivered with care.'}
           </p>
+          <a className="btn btn-hero" href="#catalog">Shop Now</a>
         </div>
       </div>
 
-      <div className="filter-bar">
+      <div className="catalog-toolbar" id="catalog">
+        <p className="muted result-count">
+          {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
+        </p>
+        <button
+          type="button"
+          className="btn btn-secondary filter-toggle mobile-only"
+          onClick={() => setFiltersOpen((o) => !o)}
+        >
+          {filtersOpen ? 'Hide filters' : 'Filters'}
+          {hasActiveFilters ? ' ·' : ''}
+        </button>
+      </div>
+
+      <div className={`filter-bar${filtersOpen ? ' open' : ''}`}>
         <input
           className="search"
           placeholder="Search name, SKU, description…"
@@ -89,6 +129,7 @@ export function HomePage() {
           placeholder="Min ₹"
           value={filters.minPrice}
           onChange={(e) => setFilter('minPrice', e.target.value)}
+          inputMode="numeric"
         />
         <input
           type="number"
@@ -97,6 +138,7 @@ export function HomePage() {
           placeholder="Max ₹"
           value={filters.maxPrice}
           onChange={(e) => setFilter('maxPrice', e.target.value)}
+          inputMode="numeric"
         />
         <select
           value={filters.sort}
@@ -117,16 +159,13 @@ export function HomePage() {
           In stock
         </label>
         {hasActiveFilters ? (
-          <button type="button" className="linkish" onClick={() => setFilters(DEFAULT_FILTERS)}>
+          <button type="button" className="linkish" onClick={clearFilters}>
             Clear
           </button>
         ) : null}
       </div>
 
       {error && <p className="error">{error}</p>}
-      <p className="muted result-count">
-        {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
-      </p>
       <div className="product-grid">
         {products.map((p) => (
           <Link to={`/products/${p.id}`} key={p.id} className="product-card">
@@ -147,7 +186,7 @@ export function HomePage() {
       {!products.length && !error && !loading ? (
         <div className="empty-state">
           <p>No products match your filters.</p>
-          <button type="button" className="btn" onClick={() => setFilters(DEFAULT_FILTERS)}>Reset filters</button>
+          <button type="button" className="btn" onClick={clearFilters}>Reset filters</button>
         </div>
       ) : null}
     </section>
