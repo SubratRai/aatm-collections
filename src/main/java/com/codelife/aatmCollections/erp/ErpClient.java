@@ -74,35 +74,48 @@ public class ErpClient {
         }
     }
 
-    /** Fetches the entire catalog (all pages) from Retail360. */
+    /** Fetches the entire catalog from Retail360. */
     public List<ErpCatalogItem> fetchCatalog() {
         try {
             List<ErpCatalogItem> all = new ArrayList<>();
-            int page = 1;
-            int totalPages = 1;
-            do {
-                final int currentPage = page;
-                JsonNode res = client().get()
-                        .uri(uri -> uri.path("/api/ecommerce/catalog")
-                                .queryParam("channelCode", props.getChannelCode())
-                                .queryParam("page", currentPage)
-                                .queryParam("limit", 200)
-                                .build())
-                        .header("Authorization", "Bearer " + token())
-                        .retrieve()
-                        .body(JsonNode.class);
-                if (res == null) break;
-                JsonNode items = res.path("items");
-                for (JsonNode n : items) {
+            JsonNode res = client().get()
+                    .uri(uri -> uri.path("/api/ecommerce/catalog")
+                            .queryParam("channelCode", props.getChannelCode())
+                            .queryParam("limit", "all")
+                            .build())
+                    .header("Authorization", "Bearer " + token())
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (res != null) {
+                for (JsonNode n : res.path("items")) {
                     all.add(toItem(n));
                 }
-                totalPages = res.path("pagination").path("totalPages").asInt(1);
-                page++;
-            } while (page <= totalPages);
+            }
+            log.info("Fetched {} catalog items from Retail360", all.size());
             return all;
         } catch (RestClientException e) {
             throw new ErpUnavailableException(
                     "Retail360 unreachable at " + props.getBaseUrl() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** Fetches a single catalog product (live stock/price) by Retail360 product id. */
+    public ErpCatalogItem fetchProduct(String erpProductId) {
+        try {
+            JsonNode n = client().get()
+                    .uri(uri -> uri.path("/api/ecommerce/products/{id}")
+                            .queryParam("channelCode", props.getChannelCode())
+                            .build(erpProductId))
+                    .header("Authorization", "Bearer " + token())
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (n == null) {
+                throw new ErpUnavailableException("Retail360 returned empty product for " + erpProductId);
+            }
+            return toItem(n);
+        } catch (RestClientException e) {
+            throw new ErpUnavailableException(
+                    "Retail360 product fetch failed for " + erpProductId + ": " + e.getMessage(), e);
         }
     }
 

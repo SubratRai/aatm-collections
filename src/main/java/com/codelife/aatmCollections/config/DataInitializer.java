@@ -1,9 +1,7 @@
 package com.codelife.aatmCollections.config;
 
-import com.codelife.aatmCollections.domain.PaymentOptions;
 import com.codelife.aatmCollections.domain.Role;
 import com.codelife.aatmCollections.entity.PaymentSettings;
-import com.codelife.aatmCollections.entity.Product;
 import com.codelife.aatmCollections.entity.UserAccount;
 import com.codelife.aatmCollections.repository.PaymentSettingsRepository;
 import com.codelife.aatmCollections.repository.ProductRepository;
@@ -14,8 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
 
 @Component
 @RequiredArgsConstructor
@@ -46,28 +42,10 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Seeded admin user admin@aatm.local / admin123");
         }
 
+        // Catalog comes from Retail360 via ERP sync — do not seed local-only products
+        // (they have no erpProductId and break order matching / inventory sync).
         if (products.count() == 0) {
-            products.save(Product.builder()
-                    .sku("AATM-001")
-                    .name("Heritage Brass Diya")
-                    .description("Handcrafted brass diya for festive décor.")
-                    .price(new BigDecimal("499.00"))
-                    .category("Home")
-                    .stockQty(25)
-                    .paymentOptions(PaymentOptions.BOTH)
-                    .active(true)
-                    .build());
-            products.save(Product.builder()
-                    .sku("AATM-002")
-                    .name("Cotton Kurta Set")
-                    .description("Soft cotton everyday kurta set.")
-                    .price(new BigDecimal("1299.00"))
-                    .category("Apparel")
-                    .stockQty(40)
-                    .paymentOptions(PaymentOptions.BOTH)
-                    .active(true)
-                    .build());
-            log.info("Seeded sample catalog products");
+            log.info("No local products yet — run Admin → Catalog Sync from Retail360");
         }
     }
 }

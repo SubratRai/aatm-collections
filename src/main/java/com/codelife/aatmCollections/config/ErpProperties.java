@@ -19,6 +19,9 @@ public class ErpProperties {
     /** Sales channel code on Retail360 used for price/stock resolution. */
     private String channelCode = "ECOM";
 
-    /** Enable/disable scheduled background sync. Manual sync always works. */
+    /** Enable/disable scheduled full catalog sync (details/prices). Manual sync always works. */
     private boolean scheduledSyncEnabled = false;
+
+    /** Enable/disable scheduled quantity sync every minute. */
+    private boolean stockSyncEnabled = true;
 }

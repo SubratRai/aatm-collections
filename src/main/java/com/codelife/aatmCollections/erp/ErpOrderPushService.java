@@ -62,8 +62,12 @@ public class ErpOrderPushService {
         ArrayNode items = payload.putArray("items");
         for (OrderItem item : order.getItems()) {
             ObjectNode n = items.addObject();
-            n.put("erpProductId", item.getErpProductId());
-            n.put("sku", item.getSku());
+            if (item.getErpProductId() != null && !item.getErpProductId().isBlank()) {
+                n.put("erpProductId", item.getErpProductId());
+            }
+            if (item.getSku() != null && !item.getSku().isBlank()) {
+                n.put("sku", item.getSku());
+            }
             n.put("name", item.getProductName());
             n.put("quantity", item.getQuantity());
             n.put("unitPrice", item.getUnitPrice());

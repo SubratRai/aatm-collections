@@ -24,7 +24,7 @@ export function StoreLayout() {
             <>
               <NavLink to="/orders">Orders</NavLink>
               {isAdmin && <NavLink to="/admin/website">Website</NavLink>}
-              {isAdmin && <NavLink to="/admin/catalog">Catalog</NavLink>}
+              {isAdmin && <NavLink to="/admin/catalog">Sync Products</NavLink>}
               <button type="button" className="linkish" onClick={logout}>Logout</button>
             </>
           ) : (

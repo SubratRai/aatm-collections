@@ -5,6 +5,7 @@ import com.codelife.aatmCollections.domain.PaymentStatus;
 import com.codelife.aatmCollections.dto.OrderDtos;
 import com.codelife.aatmCollections.entity.*;
 import com.codelife.aatmCollections.erp.ErpOrderPushService;
+import com.codelife.aatmCollections.erp.ErpSyncService;
 import com.codelife.aatmCollections.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class OrderService {
     private final UserAccountRepository users;
     private final ProductRepository products;
     private final ErpOrderPushService erpOrderPushService;
+    private final ErpSyncService erpSyncService;
 
     private UserAccount user(String email) {
         return users.findByEmailIgnoreCase(email)
@@ -42,12 +44,24 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Your cart is empty");
         }
 
+        // Pull live quantities from Retail360 before allowing checkout.
+        try {
+            erpSyncService.refreshStockForProducts(items.stream().map(CartItem::getProduct).toList());
+        } catch (Exception e) {
+            log.warn("Pre-checkout stock refresh failed, continuing with local cache: {}", e.getMessage());
+        }
+
         // Validate stock before committing anything.
         for (CartItem item : items) {
             Product p = item.getProduct();
             if (!p.isActive() || item.getQuantity() > p.getStockQty()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Insufficient stock for " + p.getName() + " (available: " + p.getStockQty() + ")");
+            }
+            if ((p.getErpProductId() == null || p.getErpProductId().isBlank())
+                    && (p.getSku() == null || p.getSku().isBlank())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Product \"" + p.getName() + "\" is not linked to Retail360. Sync the catalog from Admin first.");
             }
         }
 

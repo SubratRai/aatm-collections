@@ -478,7 +478,9 @@ export function CatalogSyncPage() {
   const { success, error: notifyError } = useNotify();
   const [status, setStatus] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncingStock, setSyncingStock] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const [lastStockResult, setLastStockResult] = useState(null);
 
   const loadStatus = () => {
     api.erpStatus(token).then(setStatus).catch(() => {});
@@ -486,7 +488,7 @@ export function CatalogSyncPage() {
 
   useEffect(loadStatus, [token]);
 
-  const onSync = async () => {
+  const onSyncProducts = async () => {
     setSyncing(true);
     setLastResult(null);
     try {
@@ -495,38 +497,71 @@ export function CatalogSyncPage() {
       success(`Synced ${result.totalErpItems} products from Retail360`);
       loadStatus();
     } catch (err) {
-      notifyError(err.message || 'ERP sync failed');
+      notifyError(err.message || 'Product sync failed');
     } finally {
       setSyncing(false);
     }
   };
 
+  const onSyncStock = async () => {
+    setSyncingStock(true);
+    setLastStockResult(null);
+    try {
+      const result = await api.erpSyncStock(token);
+      setLastStockResult(result);
+      success(`Stock refreshed: ${result.changed} updated of ${result.checked} checked`);
+      loadStatus();
+    } catch (err) {
+      notifyError(err.message || 'Stock sync failed');
+    } finally {
+      setSyncingStock(false);
+    }
+  };
+
   return (
     <section className="admin-card">
-      <h1>Catalog Sync (Retail360)</h1>
+      <h1>Product Sync (Retail360)</h1>
       <p className="muted">
-        Pull products, prices, and stock from the Retail360 ERP e-commerce channel.
-        Products you have manually edited keep their local values; only stock is refreshed for them.
+        Keep website products aligned with Retail360 inventory.
+        Use <strong>Sync Products</strong> to update names, prices, images, and stock.
+        Quantities also refresh automatically every minute, and again right before checkout.
       </p>
       {status ? (
         <dl className="status-list">
           <div><dt>ERP</dt><dd>{status.erpBaseUrl}</dd></div>
           <div><dt>Channel</dt><dd>{status.channelCode}</dd></div>
-          <div><dt>Auto sync</dt><dd>{status.scheduledSyncEnabled ? 'Every 15 min' : 'Off (manual only)'}</dd></div>
-          <div><dt>Last sync</dt><dd>{status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : 'Never'}</dd></div>
-          <div className="full"><dt>Summary</dt><dd>{status.lastSyncSummary}</dd></div>
+          <div><dt>Product auto-sync</dt><dd>{status.scheduledSyncEnabled ? 'Every 15 min' : 'Off'}</dd></div>
+          <div><dt>Stock auto-sync</dt><dd>{status.stockSyncEnabled ? 'Every 1 min' : 'Off'}</dd></div>
+          <div><dt>Last product sync</dt><dd>{status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : 'Never'}</dd></div>
+          <div><dt>Last stock sync</dt><dd>{status.lastStockSyncAt ? new Date(status.lastStockSyncAt).toLocaleString() : 'Never'}</dd></div>
+          <div className="full"><dt>Product summary</dt><dd>{status.lastSyncSummary}</dd></div>
+          <div className="full"><dt>Stock summary</dt><dd>{status.lastStockSyncSummary}</dd></div>
         </dl>
       ) : null}
-      <button className="btn" type="button" onClick={onSync} disabled={syncing}>
-        {syncing ? 'Syncing…' : 'Sync now from Retail360'}
-      </button>
+      <div className="btn-row">
+        <button className="btn" type="button" onClick={onSyncProducts} disabled={syncing || syncingStock}>
+          {syncing ? 'Syncing products…' : 'Sync Products'}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onSyncStock} disabled={syncing || syncingStock}>
+          {syncingStock ? 'Refreshing stock…' : 'Refresh Stock Now'}
+        </button>
+      </div>
       {lastResult ? (
         <div className="sync-result">
-          <p className="ok">Sync complete.</p>
+          <p className="ok">Product sync complete.</p>
           <ul className="muted">
             <li>{lastResult.totalErpItems} products received from ERP</li>
             <li>{lastResult.created} created · {lastResult.updated} updated</li>
-            <li>{lastResult.stockOnlyUpdated} stock-only (admin-edited) · {lastResult.skippedNoPrice} skipped (no price)</li>
+            <li>{lastResult.stockOnlyUpdated} stock-only (admin-edited) · {lastResult.skippedNoPrice || 0} imported without ERP price</li>
+            <li>{lastResult.linkedLocal || 0} local products linked · {lastResult.deactivatedLocal || 0} deactivated (unlinked/seed)</li>
+          </ul>
+        </div>
+      ) : null}
+      {lastStockResult ? (
+        <div className="sync-result">
+          <p className="ok">Stock refresh complete.</p>
+          <ul className="muted">
+            <li>{lastStockResult.checked} products checked · {lastStockResult.changed} quantities updated</li>
           </ul>
         </div>
       ) : null}

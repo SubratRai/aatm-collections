@@ -31,6 +31,7 @@ export const api = {
   getCategories: () => request('/api/products/categories'),
   getProduct: (id) => request(`/api/products/${id}`),
   erpSync: (token) => request('/api/admin/erp/sync', { method: 'POST', token }),
+  erpSyncStock: (token) => request('/api/admin/erp/sync-stock', { method: 'POST', token }),
   erpStatus: (token) => request('/api/admin/erp/status', { token }),
   getCart: (token) => request('/api/cart', { token }),
   addToCart: (token, productId, quantity = 1) =>
@@ -44,6 +45,7 @@ export const api = {
   myOrders: (token) => request('/api/orders', { token }),
   register: (payload) => request('/api/auth/register', { method: 'POST', body: payload }),
   login: (payload) => request('/api/auth/login', { method: 'POST', body: payload }),
+  refresh: (payload) => request('/api/auth/refresh', { method: 'POST', body: payload }),
   me: (token) => request('/api/auth/me', { token }),
   getAdminSiteSettings: (token) => request('/api/admin/site-settings', { token }),
   updateSiteSettings: (token, payload) =>

@@ -17,10 +17,21 @@ public class AdminErpController {
 
     private final ErpSyncService erpSyncService;
 
+    /** Full product sync: details, prices, images, and stock. */
     @PostMapping("/sync")
     public ErpSyncService.SyncResult sync() {
         try {
             return erpSyncService.syncCatalog();
+        } catch (ErpClient.ErpUnavailableException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
+        }
+    }
+
+    /** Quantity-only sync from Retail360. */
+    @PostMapping("/sync-stock")
+    public ErpSyncService.StockSyncResult syncStock() {
+        try {
+            return erpSyncService.syncStock();
         } catch (ErpClient.ErpUnavailableException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
         }
