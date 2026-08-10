@@ -27,6 +27,7 @@ public final class ProductDtos {
         private BigDecimal price;
         private String category;
         private String imageUrl;
+        private java.util.List<String> imageUrls;
         private int stockQty;
         private boolean active;
         private PaymentOptions paymentOptions;

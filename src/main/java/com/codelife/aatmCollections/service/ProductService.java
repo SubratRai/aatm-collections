@@ -87,6 +87,13 @@ public class ProductService {
         dto.setPrice(p.getPrice());
         dto.setCategory(p.getCategory());
         dto.setImageUrl(p.getImageUrl());
+        java.util.List<String> gallery = p.getImageUrls();
+        if (gallery == null || gallery.isEmpty()) {
+            gallery = p.getImageUrl() == null || p.getImageUrl().isBlank()
+                    ? java.util.List.of()
+                    : java.util.List.of(p.getImageUrl());
+        }
+        dto.setImageUrls(gallery);
         dto.setStockQty(p.getStockQty());
         dto.setActive(p.isActive());
         dto.setPaymentOptions(p.getPaymentOptions());

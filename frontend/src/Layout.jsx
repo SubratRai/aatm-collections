@@ -4,10 +4,13 @@ import { api } from './api';
 import { useAuth } from './AuthContext';
 import { useNotify } from './NotificationContext';
 import { useSite } from './SiteContext';
+import { useStoreLists } from './wishlistCompare';
+import { CATEGORY_TREE, STORE } from './storeContent';
 
 export function StoreLayout() {
   const { user, logout, isAdmin } = useAuth();
   const { settings } = useSite();
+  const { wishCount, compareCount } = useStoreLists();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -23,7 +26,6 @@ export function StoreLayout() {
     setSearchText(searchParams.get('search') || '');
   }, [searchParams]);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname, location.search]);
@@ -36,18 +38,26 @@ export function StoreLayout() {
   const onSearch = (e) => {
     e.preventDefault();
     const q = searchText.trim();
-    navigate(q ? `/?search=${encodeURIComponent(q)}` : '/');
+    navigate(q ? `/shop?search=${encodeURIComponent(q)}` : '/shop');
     setMenuOpen(false);
   };
 
   const activeCategory = searchParams.get('category') || '';
+  const liveCats = categories.length ? categories : CATEGORY_TREE.map((c) => c.label);
+  const siteName = settings?.siteName || STORE.name;
 
-  const navLinks = (
+  const iconNav = (
     <>
-      <NavLink to="/" end onClick={() => setMenuOpen(false)}>Home</NavLink>
-      <NavLink to="/cart" onClick={() => setMenuOpen(false)}>Cart</NavLink>
+      <NavLink to="/wishlist" className="icon-link" onClick={() => setMenuOpen(false)}>
+        Wishlist{wishCount ? <span className="count-pill">{wishCount}</span> : null}
+      </NavLink>
+      <NavLink to="/compare" className="icon-link" onClick={() => setMenuOpen(false)}>
+        Compare{compareCount ? <span className="count-pill">{compareCount}</span> : null}
+      </NavLink>
+      <NavLink to="/cart" className="icon-link" onClick={() => setMenuOpen(false)}>Cart</NavLink>
       {user ? (
         <>
+          <NavLink to="/account" onClick={() => setMenuOpen(false)}>My Account</NavLink>
           <NavLink to="/orders" onClick={() => setMenuOpen(false)}>Orders</NavLink>
           {isAdmin && <NavLink to="/admin/website" onClick={() => setMenuOpen(false)}>Website</NavLink>}
           {isAdmin && <NavLink to="/admin/catalog" onClick={() => setMenuOpen(false)}>Sync</NavLink>}
@@ -61,17 +71,22 @@ export function StoreLayout() {
 
   return (
     <div className="app-shell">
+      <div className="announce-bar">
+        <span>Free Shipping · Easy Return · 100% Payment Secure</span>
+        <a href={`tel:${STORE.phone.replace(/\s/g, '')}`}>Call Us {STORE.phone}</a>
+      </div>
+
       <header className="topbar">
         <div className="topbar-inner">
           <Link to="/" className="brand" onClick={() => setMenuOpen(false)}>
             {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt={settings.siteName || 'Logo'} className="brand-logo" />
+              <img src={settings.logoUrl} alt={siteName} className="brand-logo" />
             ) : (
-              <span className="brand-mark">{(settings?.siteName || 'A').slice(0, 1)}</span>
+              <span className="brand-mark">{siteName.slice(0, 1)}</span>
             )}
             <span className="brand-text">
-              <span className="brand-name">{settings?.siteName || 'Aatm Collections'}</span>
-              <span className="brand-tag">Where Spirituality Meets Elegance</span>
+              <span className="brand-name">{siteName}</span>
+              <span className="brand-tag">{STORE.tagline}</span>
             </span>
           </Link>
 
@@ -85,7 +100,7 @@ export function StoreLayout() {
             <button type="submit" aria-label="Search">⌕</button>
           </form>
 
-          <nav className="nav desktop-only">{navLinks}</nav>
+          <nav className="nav desktop-only">{iconNav}</nav>
 
           <button
             type="button"
@@ -111,63 +126,72 @@ export function StoreLayout() {
 
       {menuOpen && (
         <div className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu">
-          <nav className="mobile-nav">{navLinks}</nav>
+          <nav className="mobile-nav">
+            <NavLink to="/" end onClick={() => setMenuOpen(false)}>Home</NavLink>
+            <NavLink to="/shop" onClick={() => setMenuOpen(false)}>Shop</NavLink>
+            <NavLink to="/about" onClick={() => setMenuOpen(false)}>About</NavLink>
+            <NavLink to="/blog" onClick={() => setMenuOpen(false)}>Blog</NavLink>
+            <NavLink to="/contact" onClick={() => setMenuOpen(false)}>Contact</NavLink>
+            {iconNav}
+          </nav>
         </div>
       )}
       {menuOpen && <button type="button" className="mobile-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} />}
 
-      {categories.length > 0 && (
-        <nav className="category-strip" aria-label="Categories">
-          <Link to="/" className={!activeCategory ? 'active' : ''}>All Products</Link>
-          {categories.map((c) => (
-            <Link
-              key={c}
-              to={`/?category=${encodeURIComponent(c)}`}
-              className={activeCategory === c ? 'active' : ''}
-            >
-              {c}
-            </Link>
-          ))}
-        </nav>
-      )}
+      <nav className="category-strip mega-strip" aria-label="Shop menu">
+        <Link to="/" className={location.pathname === '/' ? 'active' : ''}>Home</Link>
+        <Link to="/shop" className={location.pathname.startsWith('/shop') && !activeCategory ? 'active' : ''}>Shop</Link>
+        {liveCats.slice(0, 10).map((c) => (
+          <Link
+            key={c}
+            to={`/shop?category=${encodeURIComponent(c)}`}
+            className={activeCategory === c ? 'active' : ''}
+          >
+            {c}
+          </Link>
+        ))}
+        <Link to="/about">About</Link>
+        <Link to="/blog">Blog</Link>
+        <Link to="/contact">Contact</Link>
+      </nav>
 
       <main className="main">
         <Outlet />
       </main>
 
-      <section className="trust-strip">
-        <div className="trust-item"><span className="trust-icon" aria-hidden="true">🚚</span><div><strong>Free Shipping</strong><span>On all prepaid orders</span></div></div>
-        <div className="trust-item"><span className="trust-icon" aria-hidden="true">💰</span><div><strong>Cash on Delivery</strong><span>Pay when it arrives</span></div></div>
-        <div className="trust-item"><span className="trust-icon" aria-hidden="true">↩️</span><div><strong>Easy Returns</strong><span>Simple exchange policy</span></div></div>
-        <div className="trust-item"><span className="trust-icon" aria-hidden="true">🔒</span><div><strong>Secure Checkout</strong><span>Your data stays safe</span></div></div>
-      </section>
-
       <footer className="footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <div className="footer-brand">{settings?.siteName || 'Aatm Collections'}</div>
-            <p className="footer-tagline">Where Spirituality Meets Elegance</p>
-            <p className="footer-desc">
-              {settings?.metaDescription
-                || 'We help you create class and elegance for your home — pooja articles, brass decor, healing gemstones and more.'}
-            </p>
+            <div className="footer-brand">{siteName}</div>
+            <p className="footer-tagline">{STORE.tagline}</p>
+            <p className="footer-desc">{STORE.welcome}</p>
           </div>
           <div className="footer-col">
             <h4>Explore</h4>
-            <Link to="/">Shop</Link>
-            <Link to="/cart">Cart</Link>
-            <Link to="/orders">My Orders</Link>
-            <Link to="/login">Account</Link>
+            <Link to="/shop">Shop</Link>
+            <Link to="/wishlist">My Wishlist</Link>
+            <Link to="/compare">Compare products</Link>
+            <Link to="/blog">Blog</Link>
+            <Link to="/account">My Account</Link>
+          </div>
+          <div className="footer-col">
+            <h4>Help</h4>
+            <Link to="/about">About AATM Collection</Link>
+            <Link to="/contact">Contact us</Link>
+            <Link to="/policy/privacy">Privacy Policy</Link>
+            <Link to="/policy/refunds">Refund and Returns Policy</Link>
           </div>
           <div className="footer-col">
             <h4>Contact Us</h4>
-            {settings?.supportEmail ? <a href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a> : null}
-            {settings?.supportPhone ? <a href={`tel:${settings.supportPhone}`}>{settings.supportPhone}</a> : null}
-            <span>India</span>
+            <a href={`tel:${STORE.phone.replace(/\s/g, '')}`}>{STORE.phone}</a>
+            <a href={`mailto:${STORE.emails.info}`}>{STORE.emails.info}</a>
+            <a href={`mailto:${STORE.emails.sales}`}>{STORE.emails.sales}</a>
+            <a href={STORE.social.whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>
+            <span>{STORE.address}</span>
           </div>
         </div>
         <div className="footer-bottom">
-          © {new Date().getFullYear()} {settings?.siteName || 'Aatm Collections'} · All rights reserved
+          © {new Date().getFullYear()} {siteName} · All rights reserved
         </div>
       </footer>
     </div>

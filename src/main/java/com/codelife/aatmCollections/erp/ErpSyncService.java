@@ -79,7 +79,7 @@ public class ErpSyncService {
                     p.setName(item.name());
                     p.setDescription(item.description());
                     p.setCategory(item.category());
-                    if (item.imageUrl() != null) p.setImageUrl(item.imageUrl());
+                    p.applyImageGallery(item.imageUrls());
                     if (hasPrice) {
                         p.setPrice(item.price());
                     } else if (p.getPrice() == null || p.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
@@ -96,19 +96,20 @@ public class ErpSyncService {
                 if (!hasPrice) {
                     skippedNoPrice++;
                 }
-                products.save(Product.builder()
+                Product createdProduct = Product.builder()
                         .erpProductId(item.erpProductId())
                         .sku(item.sku())
                         .name(item.name())
                         .description(item.description())
                         .category(item.category())
-                        .imageUrl(item.imageUrl())
                         .price(hasPrice ? price : BigDecimal.ZERO)
                         .stockQty(item.stockQty())
                         .active(hasPrice)
                         .lastFullSyncAt(Instant.now())
                         .lastStockSyncAt(Instant.now())
-                        .build());
+                        .build();
+                createdProduct.applyImageGallery(item.imageUrls());
+                products.save(createdProduct);
                 created++;
             }
         }

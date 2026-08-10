@@ -121,6 +121,22 @@ public class ErpClient {
 
     private ErpCatalogItem toItem(JsonNode n) {
         BigDecimal price = n.hasNonNull("price") ? new BigDecimal(n.get("price").asText()) : null;
+        java.util.List<String> imageUrls = new java.util.ArrayList<>();
+        JsonNode urlsNode = n.path("imageUrls");
+        if (urlsNode.isArray()) {
+            for (JsonNode u : urlsNode) {
+                if (u != null && u.isTextual() && !u.asText().isBlank()) {
+                    imageUrls.add(u.asText());
+                }
+            }
+        }
+        String imageUrl = n.path("imageUrl").asText(null);
+        if (imageUrls.isEmpty() && imageUrl != null && !imageUrl.isBlank()) {
+            imageUrls.add(imageUrl);
+        }
+        if ((imageUrl == null || imageUrl.isBlank()) && !imageUrls.isEmpty()) {
+            imageUrl = imageUrls.get(0);
+        }
         return new ErpCatalogItem(
                 n.path("erpProductId").asText(null),
                 n.path("sku").asText(null),
@@ -128,7 +144,8 @@ public class ErpClient {
                 n.path("description").asText(""),
                 n.path("category").asText(null),
                 n.path("brandName").asText(null),
-                n.path("imageUrl").asText(null),
+                imageUrl,
+                List.copyOf(imageUrls),
                 price,
                 n.path("stockQty").asInt(0));
     }
@@ -141,6 +158,7 @@ public class ErpClient {
             String category,
             String brandName,
             String imageUrl,
+            List<String> imageUrls,
             BigDecimal price,
             int stockQty) {
     }

@@ -6,6 +6,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -39,8 +41,17 @@ public class Product {
     @Column(length = 100)
     private String category;
 
+    /** Primary / cover image (first of imageUrls). Kept for list cards and cart. */
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    /** Full gallery synced from Retail360. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "url", columnDefinition = "TEXT")
+    @OrderColumn(name = "sort_order")
+    @Builder.Default
+    private List<String> imageUrls = new ArrayList<>();
 
     @Column(name = "stock_qty", nullable = false)
     @Builder.Default
@@ -67,4 +78,19 @@ public class Product {
 
     @Version
     private Long version;
+
+    /** Keep imageUrl aligned with the first gallery entry. */
+    public void applyImageGallery(List<String> urls) {
+        List<String> clean = urls == null ? List.of() : urls.stream()
+                .filter(u -> u != null && !u.isBlank())
+                .distinct()
+                .toList();
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        } else {
+            this.imageUrls.clear();
+        }
+        this.imageUrls.addAll(clean);
+        this.imageUrl = clean.isEmpty() ? null : clean.get(0);
+    }
 }

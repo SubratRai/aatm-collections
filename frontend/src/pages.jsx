@@ -1,194 +1,93 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from './api';
 import { useAuth } from './AuthContext';
 import { useNotify } from './NotificationContext';
 import { useSite } from './SiteContext';
-
-const DEFAULT_FILTERS = {
-  search: '',
-  category: '',
-  minPrice: '',
-  maxPrice: '',
-  inStock: false,
-  sort: 'name',
-};
+import { ProductCard } from './ProductCard';
+import { useStoreLists } from './wishlistCompare';
+import { CATEGORY_TREE, STORE, TRUST_POINTS } from './storeContent';
 
 export function HomePage() {
-  const { error: notifyError } = useNotify();
   const { settings } = useSite();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { error: notifyError } = useNotify();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Keep filters in sync with URL (header search + category strip)
-  useEffect(() => {
-    setFilters((f) => ({
-      ...f,
-      search: searchParams.get('search') || '',
-      category: searchParams.get('category') || '',
-    }));
-  }, [searchParams]);
 
   useEffect(() => {
     api.getCategories().then(setCategories).catch(() => {});
-  }, []);
+    api.getProducts({ sort: 'name' })
+      .then((data) => setProducts(Array.isArray(data) ? data.slice(0, 8) : []))
+      .catch((e) => notifyError(e.message || 'Could not load products'));
+  }, [notifyError]);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setLoading(true);
-      api.getProducts({
-        search: filters.search,
-        category: filters.category,
-        minPrice: filters.minPrice,
-        maxPrice: filters.maxPrice,
-        inStock: filters.inStock ? 'true' : '',
-        sort: filters.sort,
-      })
-        .then((data) => {
-          setProducts(data);
-          setError('');
-        })
-        .catch((e) => {
-          setError(e.message);
-          notifyError(e.message || 'Could not load products');
-        })
-        .finally(() => setLoading(false));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [filters, notifyError]);
-
-  const setFilter = (name, value) => {
-    setFilters((f) => ({ ...f, [name]: value }));
-    if (name === 'search' || name === 'category') {
-      const next = new URLSearchParams(searchParams);
-      if (value) next.set(name, value);
-      else next.delete(name);
-      setSearchParams(next, { replace: true });
-    }
-  };
-
-  const clearFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setSearchParams({}, { replace: true });
-  };
-
-  const hasActiveFilters = filters.search || filters.category || filters.minPrice
-    || filters.maxPrice || filters.inStock || filters.sort !== 'name';
+  const tiles = categories.length
+    ? categories.slice(0, 8)
+    : CATEGORY_TREE.map((c) => c.label).slice(0, 8);
 
   return (
     <section>
       <div className="hero">
         <div className="hero-text">
-          <p className="hero-kicker">Curated collections</p>
-          <h1>{settings?.siteName || 'Aatm Collections'}</h1>
+          <p className="hero-kicker">AATM Collection</p>
+          <h1>{settings?.siteName || STORE.name}</h1>
           <p className="hero-sub">
-            {settings?.metaDescription || 'Handpicked pieces for your home and wardrobe, delivered with care.'}
+            {settings?.metaDescription || STORE.welcome}
           </p>
-          <a className="btn btn-hero" href="#catalog">Shop Now</a>
+          <div className="hero-actions">
+            <Link className="btn btn-hero" to="/shop">Shop Now</Link>
+            <Link className="btn btn-secondary" to="/about">About us</Link>
+          </div>
         </div>
       </div>
 
-      <div className="catalog-toolbar" id="catalog">
-        <p className="muted result-count">
-          {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
-        </p>
-        <button
-          type="button"
-          className="btn btn-secondary filter-toggle mobile-only"
-          onClick={() => setFiltersOpen((o) => !o)}
-        >
-          {filtersOpen ? 'Hide filters' : 'Filters'}
-          {hasActiveFilters ? ' ·' : ''}
-        </button>
+      <div className="home-cats">
+        <div className="section-head">
+          <h2>Shop by category</h2>
+          <Link to="/shop">View all →</Link>
+        </div>
+        <div className="cat-tiles">
+          {tiles.map((c) => (
+            <Link key={c} className="cat-tile" to={`/shop?category=${encodeURIComponent(c)}`}>
+              <span>{c}</span>
+            </Link>
+          ))}
+        </div>
       </div>
 
-      <div className={`filter-bar${filtersOpen ? ' open' : ''}`}>
-        <input
-          className="search"
-          placeholder="Search name, SKU, description…"
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-        />
-        <select
-          value={filters.category}
-          onChange={(e) => setFilter('category', e.target.value)}
-          aria-label="Category"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <input
-          type="number"
-          min="0"
-          className="price-input"
-          placeholder="Min ₹"
-          value={filters.minPrice}
-          onChange={(e) => setFilter('minPrice', e.target.value)}
-          inputMode="numeric"
-        />
-        <input
-          type="number"
-          min="0"
-          className="price-input"
-          placeholder="Max ₹"
-          value={filters.maxPrice}
-          onChange={(e) => setFilter('maxPrice', e.target.value)}
-          inputMode="numeric"
-        />
-        <select
-          value={filters.sort}
-          onChange={(e) => setFilter('sort', e.target.value)}
-          aria-label="Sort"
-        >
-          <option value="name">Name A–Z</option>
-          <option value="name_desc">Name Z–A</option>
-          <option value="price_asc">Price: low to high</option>
-          <option value="price_desc">Price: high to low</option>
-        </select>
-        <label className="check-label">
-          <input
-            type="checkbox"
-            checked={filters.inStock}
-            onChange={(e) => setFilter('inStock', e.target.checked)}
-          />
-          In stock
-        </label>
-        {hasActiveFilters ? (
-          <button type="button" className="linkish" onClick={clearFilters}>
-            Clear
-          </button>
-        ) : null}
-      </div>
-
-      {error && <p className="error">{error}</p>}
-      <div className="product-grid">
-        {products.map((p) => (
-          <Link to={`/products/${p.id}`} key={p.id} className="product-card">
-            <div className="product-image">
-              {p.imageUrl ? <img src={p.imageUrl} alt={p.name} /> : <div className="ph">{p.name.slice(0, 1)}</div>}
-              {p.stockQty <= 0 ? <span className="badge badge-out">Out of stock</span> : null}
-              {p.stockQty > 0 && p.stockQty <= 5 ? <span className="badge badge-low">Only {p.stockQty} left</span> : null}
-            </div>
-            <span className="card-category">{p.category || 'General'}</span>
-            <h3>{p.name}</h3>
-            <div className="card-footer">
-              <strong className="price">₹{Number(p.price).toFixed(2)}</strong>
-              <span className="card-cta">View →</span>
-            </div>
-          </Link>
+      <div className="trust-strip home-trust">
+        {TRUST_POINTS.map((t) => (
+          <div className="trust-item" key={t.title}>
+            <span className="trust-icon" aria-hidden="true">{t.icon}</span>
+            <div><strong>{t.title}</strong><span>{t.text}</span></div>
+          </div>
         ))}
       </div>
-      {!products.length && !error && !loading ? (
-        <div className="empty-state">
-          <p>No products match your filters.</p>
-          <button type="button" className="btn" onClick={clearFilters}>Reset filters</button>
+
+      <div className="section-head">
+        <h2>Featured products</h2>
+        <Link to="/shop">Shop all →</Link>
+      </div>
+      <div className="product-grid">
+        {products.map((p) => <ProductCard key={p.id} product={p} />)}
+      </div>
+
+      <div className="newsletter-band">
+        <div>
+          <h2>Subscribe to our newsletter and join us!</h2>
+          <p className="muted">New arrivals, festival gifting and artisan stories.</p>
         </div>
-      ) : null}
+        <form
+          className="newsletter-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.currentTarget.reset();
+          }}
+        >
+          <input type="email" required placeholder="Your email" aria-label="Email" />
+          <button className="btn" type="submit">Subscribe</button>
+        </form>
+      </div>
     </section>
   );
 }
@@ -196,14 +95,17 @@ export function HomePage() {
 export function ProductPage() {
   const { id } = useParams();
   const { token, user } = useAuth();
-  const { success, error: notifyError } = useNotify();
+  const { success, error: notifyError, info } = useNotify();
   const navigate = useNavigate();
+  const { isWished, isCompared, toggleWishlist, toggleCompare } = useStoreLists();
   const [product, setProduct] = useState(null);
   const [qty, setQty] = useState(1);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
+    setActiveImage(0);
     api.getProduct(id)
       .then(setProduct)
       .catch((e) => {
@@ -214,6 +116,12 @@ export function ProductPage() {
 
   if (error) return <p className="error">{error}</p>;
   if (!product) return <p>Loading…</p>;
+
+  const gallery = (Array.isArray(product.imageUrls) && product.imageUrls.length
+    ? product.imageUrls
+    : (product.imageUrl ? [product.imageUrl] : [])
+  ).filter(Boolean);
+  const mainImage = gallery[Math.min(activeImage, Math.max(gallery.length - 1, 0))] || null;
 
   const onAddToCart = async () => {
     if (!user) {
@@ -235,8 +143,28 @@ export function ProductPage() {
 
   return (
     <section className="product-detail">
-      <div className="product-image large">
-        {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : <div className="ph">{product.name.slice(0, 1)}</div>}
+      <div className="product-gallery">
+        {gallery.length > 1 ? (
+          <div className="gallery-thumbs" role="listbox" aria-label="Product images">
+            {gallery.map((url, index) => (
+              <button
+                key={`${url}-${index}`}
+                type="button"
+                className={`gallery-thumb ${index === activeImage ? 'active' : ''}`}
+                onClick={() => setActiveImage(index)}
+                aria-label={`View image ${index + 1}`}
+                aria-selected={index === activeImage}
+              >
+                <img src={url} alt="" />
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="product-image large gallery-main">
+          {mainImage
+            ? <img src={mainImage} alt={product.name} />
+            : <div className="ph">{product.name.slice(0, 1)}</div>}
+        </div>
       </div>
       <div>
         <span className="card-category">{product.category || 'General'}</span>
@@ -256,6 +184,24 @@ export function ProductPage() {
             </div>
             <button type="button" className="btn" onClick={onAddToCart} disabled={adding}>
               {adding ? 'Adding…' : 'Add to cart'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => info(toggleWishlist(product.id) ? 'Added to wishlist' : 'Removed from wishlist')}
+            >
+              {isWished(product.id) ? 'Wishlisted' : 'Add to wishlist'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                const res = toggleCompare(product.id);
+                if (res.full) notifyError('Compare list is full (max 4).');
+                else info(res.added ? 'Added to compare' : 'Removed from compare');
+              }}
+            >
+              {isCompared(product.id) ? 'In compare' : 'Compare'}
             </button>
             <Link className="linkish" to="/cart">View cart</Link>
           </div>
